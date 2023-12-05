@@ -1,0 +1,77 @@
+{
+  "name": "seguridad",
+  "version": "0.0.1",
+  "description": "microservicio de seguridad",
+  "keywords": [
+    "loopback-application",
+    "loopback"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": "16 || 18 || 20"
+  },
+  "scripts": {
+    "build": "lb-tsc",
+    "build:watch": "lb-tsc --watch",
+    "lint": "npm run eslint && npm run prettier:check",
+    "lint:fix": "npm run eslint:fix && npm run prettier:fix",
+    "prettier:cli": "lb-prettier \"**/*.ts\" \"**/*.js\"",
+    "prettier:check": "npm run prettier:cli -- -l",
+    "prettier:fix": "npm run prettier:cli -- --write",
+    "eslint": "lb-eslint --report-unused-disable-directives .",
+    "eslint:fix": "npm run eslint -- --fix",
+    "pretest": "npm run rebuild",
+    "test": "lb-mocha --allow-console-logs \"dist/__tests__\"",
+    "posttest": "npm run lint",
+    "test:dev": "lb-mocha --allow-console-logs dist/__tests__/**/*.js && npm run posttest",
+    "docker:build": "docker build -t seguridad .",
+    "docker:run": "docker run -p 3000:3000 -d seguridad",
+    "premigrate": "npm run build",
+    "migrate": "node ./dist/migrate",
+    "preopenapi-spec": "npm run build",
+    "openapi-spec": "node ./dist/openapi-spec",
+    "prestart": "npm run rebuild",
+    "start": "node -r source-map-support/register .",
+    "clean": "lb-clean dist *.tsbuildinfo .eslintcache",
+    "rebuild": "npm run clean && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "",
+  "license": "",
+  "files": [
+    "README.md",
+    "dist",
+    "src",
+    "!*/__tests__"
+  ],
+  "dependencies": {
+    "@loopback/authentication": "^10.1.3",
+    "@loopback/boot": "^6.1.2",
+    "@loopback/core": "^5.1.2",
+    "@loopback/repository": "^6.1.2",
+    "@loopback/rest": "^13.1.2",
+    "@loopback/rest-explorer": "^6.1.2",
+    "@loopback/security": "^0.10.3",
+    "@loopback/service-proxy": "^6.1.2",
+    "crypto-js": "^4.1.1",
+    "generate-password": "^1.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "loopback-connector-mongodb": "^5.6.0",
+    "mongodb": "3.6",
+    "parse-bearer-token": "^1.0.1",
+    "tslib": "^2.0.0"
+  },
+  "devDependencies": {
+    "@loopback/build": "^10.1.2",
+    "@loopback/eslint-config": "^14.0.3",
+    "@loopback/testlab": "^6.1.2",
+    "@types/node": "^16.18.40",
+    "eslint": "^8.47.0",
+    "source-map-support": "^0.5.21",
+    "typescript": "~5.1.6"
+  }
+}
