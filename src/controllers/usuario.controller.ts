@@ -18,10 +18,10 @@ import {
   response,
   HttpErrors,
 } from '@loopback/rest';
-import {Credenciales, FactorDeAutenticacionPorCodigo, Login, PermisosRolMenu, Usuario} from '../models';
+import {Credenciales, FactorDeAutenticacionPorCodigo, Login, PermisosRolMenu, Usuario, UsuarioPublico} from '../models';
 import {LoginRepository, UsuarioRepository} from '../repositories';
 import {service} from '@loopback/core';
-import {AuthService, SeguridadUsuarioService} from '../services';
+import {AuthService, NotificacionesService, SeguridadUsuarioService} from '../services';
 import {authenticate} from '@loopback/authentication';
 import {ConfiguracionSeguridad} from '../config/seguridad.config';
 import {UserProfile} from '@loopback/security';
@@ -35,7 +35,9 @@ export class UsuarioController {
     @repository(LoginRepository)
     public loginRepository: LoginRepository,
     @service(AuthService)
-    public servicioAuth: AuthService
+    public servicioAuth: AuthService,
+    @service(NotificacionesService)
+    public servicioNotificaciones: NotificacionesService,
   ) {}
 
   @authenticate({
@@ -75,28 +77,118 @@ export class UsuarioController {
     description: 'Usuario model instance',
     content: {'application/json': {schema: getModelSchemaRef(Usuario)}},
   })
-  async createPublicUser(
+  async crearUsuarioPublic(
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(Usuario, {
-            title: 'NewUsuario',
-            exclude: ['_id'],
-          }),
+          schema: getModelSchemaRef(UsuarioPublico, {}),
         },
       },
     })
-    usuario: Omit<Usuario, '_id'>,
+    usuarioP: UsuarioPublico,
   ): Promise<Usuario> {
+
+    let tipoUserCorreo = "Cliente"
+
+    //se crea un objeto de tipo usuario para crear un usuario en la base de datos
+    let usuario: Usuario = new Usuario();
     // cerar la clave
     let clave = this.servicioSeguridad.crearTexto(10);
     // cifrar la clave
     let claveCifrada = this.servicioSeguridad.cifrarTexto(clave);
     // asignar la clave cifrada al usuario
     usuario.clave = claveCifrada;
-    // guardar el usuario
-    return this.usuarioRepository.create(usuario);
+    //hash de validacion de correo
+
+    usuario.primerNombre = usuarioP.primeroNombre;
+    usuario.segundoNombre = usuarioP.segundoNombre;
+    usuario.primerApellido = usuarioP.primeroApellido;
+    usuario.segundoApellido = usuarioP.segundoApellido;
+    usuario.correo = usuarioP.correo;
+
+    let codigoHash = this.servicioSeguridad.crearTexto(100);
+    usuario.codigoHash = codigoHash;
+    usuario.EstadocodigoHash = false;
+    usuario.celular = usuarioP.celular;
+    usuario.correo = usuarioP.correo;
+
+    if(usuarioP.tipoUsuario == "Conductor" || usuarioP.tipoUsuario == "conductor"){
+      usuario.rolId = "65648e31cca56e0da0b21837";
+      tipoUserCorreo = "Conductor";
+    }else{
+      usuario.rolId = "65648e1ccca56e0da0b21836";
+    }
+
+    console.log(usuario);
+
+    // se crea el usuario
+    this.usuarioRepository.create(usuario);
+
+
+    // enviar el correo con el codigo hash
+    let mensaje = `<h1> Bienvenido a la plataforma </h1>
+    <p> Para validar el correo haga click en el siguiente enlace </p>
+    <p> Su tipo de usuario es: ${tipoUserCorreo} </p>
+    <a href="http://[::1]:3000/usuario/verificar-correo/${codigoHash}"> Click aqui </a>
+    <p> Su clave es: ${clave} </p>
+    `;
+
+    let asunto = "Validacion de correo";
+
+    // enviar el correo
+    await this.servicioNotificaciones.enviarEmail(mensaje, usuario.primerNombre, usuario.correo, asunto);
+
+
+
+   try{
+    console.log("Se creo el usuario");
+    return usuario;
+
+  } // guardar el usuario
+   catch(error){
+      console.log(error);
+      throw new HttpErrors[401]("Error en la creacion del usuario");
+   }
+
   }
+
+@get('/usuario/verificar-correo/{codigoHash}')
+async verificarCorreo(
+  @param.query.string('codigoHash') codigoHash: string,
+): Promise<string> {
+  // Validar el código hash y activar el usuario
+  let usuario = await this.usuarioRepository.findOne({
+    where: {
+      codigoHash: codigoHash,
+      EstadocodigoHash: false,
+    },
+  });
+
+  if (!usuario) {
+    throw new HttpErrors.NotFound('Usuario no encontrado o ya activado');
+  }
+
+  // Realizar las operaciones adicionales necesarias para activar el usuario
+  usuario.EstadocodigoHash = true;
+  await this.usuarioRepository.update(usuario);
+
+  if(usuario.rolId == "65648e1ccca56e0da0b21836"){
+    console.log("Se envio el correo cliente");
+    console.log(usuario);
+
+    this.servicioNotificaciones.enviarUsuarioVerificado(usuario.primerNombre, usuario.segundoNombre!, usuario.primerApellido, usuario.segundoApellido!, usuario.correo, usuario.celular);
+  }
+  if(usuario.rolId == "65648e31cca56e0da0b21837"){
+    console.log("Se envio el correo conductor");
+    console.log(usuario);
+    this.servicioNotificaciones.enviarConductorVerificado(usuario.primerNombre, usuario.segundoNombre!, usuario.primerApellido, usuario.segundoApellido!, usuario.correo, usuario.celular);
+  }
+
+ this.servicioNotificaciones.enviarEmail("Su cuenta ha sido activada", usuario.primerNombre, usuario.correo, "Cuenta activada");
+
+
+  return "usuario activado";
+}
 
   @get('/usuarios/count')
   @response(200, {

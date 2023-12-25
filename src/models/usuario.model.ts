@@ -51,6 +51,17 @@ export class Usuario extends Entity {
   })
   clave?: string;
 
+  //odigo hash de validacion
+  @property({
+    type: 'string',
+  })
+  codigoHash?: string;
+
+  @property({
+    type: 'boolean',
+  })
+  EstadocodigoHash?: boolean;
+
   @hasMany(() => Login)
   logins: Login[];
 
